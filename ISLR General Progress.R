@@ -346,6 +346,138 @@ Boston[medv == min(medv),] # show the data for the lowest median home value
 c(HomesW7pluroom = nrow(Boston[rm > 7, ]), HomesW8pluroom = nrow(Boston[rm > 8, ])) # find number of towns with more than 7 or 8 rooms in the building
 
 
+
+#### ADVERTISING DATA ####
+#### Mainly following https://rstudio-pubs-static.s3.amazonaws.com/249959_d71491a56f8242909331dfee0e25b813.html
+library(MASS)
+library(ISLR)
+wd <- getwd()
+file = paste0(wd, "/ISLR Advertising Data.csv")
+ads <- read.csv(
+  file,
+  header = T, # file contains the names of the variables as its first line
+  check.names = T, # to check the names of the variables to ensure syntactical validity; If necessary they are adjusted and to ensure that there are no duplicates. 
+  blank.lines.skip = T  # to ignore the blank lines in the input
+)[,-1] # without the first column (telling R to remove the 1st column - it's just index)
+attach(ads)
+head(ads)
+
+
+########### Initial Work - Exploration
+summary(ads)
+pairs(ads, pch = ".")
+
+plot(ads$TV, ads$Sales, 
+     xlab = "TV", 
+     ylab = "Sales (in thousands)")
+
+########### Is there a relationship between advertising and budget?
+# trying linear model: lm(formula, dataframe) e.g. lm(y ~ x^2, mydata) where my data has a column named x and one named y
+# Tilde (~) is used to separate the left- and right-hand sides in a model formula. 
+# linear models of Sales on individual explanatory variables
+SalesTV.lm <- lm(formula = Sales ~ TV, data=ads) ; summary(SalesTV.lm)
+SalesRadio.lm <- lm(Sales ~ Radio, data=ads) ; summary(SalesRadio.lm)
+SalesNews.lm <- lm(Sales ~ Newspaper, data=ads) ; summary(SalesNews.lm)
+
+####### multiple regression model of sales onto TV, radio, and newspaper
+# The dot (.) is to follow no specific model; so this is saying to model sales by all in the dataset (same as TV + Radio + Newspaper)
+# Test hypothesis H0 : beta_TV = beta_radio = beta_newspaper = 0 (to test none of the explanatory variable has any effect on Sales)
+# F-test on the multiple regression model indicates clear evidence of a relationship between advertising and sales (small p-value)
+SalesTVRadio.lm <- lm(Sales ~ TV + Radio, data=ads)
+SalesAll.lm <- lm(Sales ~ ., data=ads); summary(SalesAll.lm)
+
+########### How strong is the relationship in the model?
+# Let's examine this using residual standard error (RSE) and R-squared (RSQ) values. Here is a very good read: https://statisticsbyjim.com/regression/standard-error-regression-vs-r-squared/
+# Good notes for RSS, RSE, MSE, RMSE here: https://stats.stackexchange.com/questions/110999/r-confused-on-residual-terminology
+# the summary of the model is a list of many model summaries, one of them is sigma which is the RSE (not accessible from the model properties)
+# notice the RSE is not the same as the residual sd. They are two different things in nature.
+SalesAll.lm.residuals = SalesAll.lm$residuals # to store the model residuals into a list (once the model is run, it creates a list object with many properties/columns)
+sd(SalesAll.lm.residuals)
+RSE = summary(SalesAll.lm)$sigma
+RSE / mean(Sales) * 100  # this provides an idea on the residual variation to overall response mean
+RSQ = summary(SalesAll.lm)$r.sq 
+cat("Multiple regression model RSE = ", round(RSE, 3), "\nMultiple regression model R-squared = ", round(RSQ, 3)) # print a concatenation without showing in character form (\n is for next line)
+
+### calculating the R-squared using its formula manually
+# yhat = SalesAll.lm$fitted.values
+# y = Sales
+# ybar = mean(y)
+# rsq=1-sum((y-yhat)^2)/sum((y-ybar)^2)
+# var(yhat)/var(y) # this is also equal to rsq in linear regression
+# cor(yhat, y)^2 # this is also equal to rsq in linear regression
+
+########### Which media contribute to sales?
+# let's look closer to the coefficient estimates of the model to see their values and significance
+(coeffs = summary(SalesAll.lm)$coefficients) # using () runs and print the results in console 
+
+# plotting a tornado plot to visualize the various coefficients. More options in here: https://cran.r-project.org/web/packages/tornado/vignettes/tornadoVignette.html
+# types can be percentchange, ranges, percentiles
+install.packages("tornado")
+library(tornado)
+torn1 <- tornado::tornado(SalesAll.lm, type = "percentiles", alpha = 0.05)
+plot(torn1, 
+     xlabel = "Sales", 
+     geom_bar_control = list(width = 0.4),
+     sensitivity_colors = c(2, "#69BE28"), # choosing two colors to express the effects of each variable
+)
+
+########### How large is the effect of each medium on sales?
+confint(SalesAll.lm, level = 0.95) # this is the easy and quick way for a 95% confidence level (alpha = 5%)
+
+# could collinearity be the reason for the wide CI for newspaper? (can use vif() function from library "car")
+# if no collinearity found, separate simple linear regressions can help see which one is stronger, etc.
+install.packages("car")
+require(car)
+vif(SalesAll.lm) # VIF values for each model predictors - In practice, a VIF > 5 or 10 indicates a problematic collinearity
+
+# or to do it manually to understand:
+# CI = estimate +- critical standard normal z-score for the CL * standard error of the estimate
+# a 95% CI means that 95% certainty that the estimate between value of estimate +- 1.96 standard deviation on each side. 
+# The area under the curve covers 95% of the probability that the true value falls in this interval
+# here is a good reference: https://bookdown.org/curleyjp0/psy317l_guides5/confidence-intervals.html
+# also, here are additional useful functions for finding probability related values in distributions: https://sphweb.bumc.bu.edu/otlt/MPH-Modules/BS/R/R-Manual/R-Manual10.html
+alpha = 0.05
+critZ = qnorm(1 - alpha/2, mean = 0, sd = 1) # To find a critical Z-value from standard normal (z) distribution (mean=0, sd = 1) for a two-tailed 95% confidence interval
+CI.LowerLimit = coeffs[, 1] - critZ*coeffs[, 2]
+CI.UpperLimit = coeffs[, 1] + critZ*coeffs[, 2]
+CI <- cbind(CI.LowerLimit, CI.UpperLimit)  # to bind them in column form (so the values are next to each other) rbind can be used to bind in rows
+rm(alpha, critZ, CI.LowerLimit, CI.UpperLimit)
+
+grid(nx=20, ny=20)
+boxplot(t(CI[-1,]), # putting CI into graphs to visually see in a box chart (removed intercept from plot)
+        beside = T, # to keep them beside each other - most useful in bar charts
+        col = "light green",
+        main = "Confidence Interval for the predictor coefficients",
+) 
+
+########### How accurately can we predict future sales?
+# the answer to how accurately we can estimate the response depends on whether we want to predict individual responses (use prediction interval Y = f(X) + e), 
+# or if we want to predict the average response, f(X) (use confidence interval)
+# Confidence interval is used for average value of response over a group of observations with similar characteristics and prediction interval is used for a single observation
+
+predict(SalesAll.lm, 
+        newdata = data.frame(TV=149, Radio=22, Newspaper=25), # any new data point
+        interval = "confidence") # for the average  response f(X)
+
+predict(SalesAll.lm, 
+        newdata = data.frame(TV=149,Radio=22,Newspaper=25),
+        interval = "prediction") # for individual response
+
+########### Is the relationship linear?
+plot(TV, SalesAll.lm.residuals)  # simple plot of residuals vs TV
+plot(SalesAll.lm) #diagnostic plot (Hit return to see next plot: click on console and press enter)
+
+
+########### Is there synergy among the advertising media?
+# Investigating the Interaction Effect between TV and Radio
+SalesTVRadioInt.lm <- lm(Sales ~ TV + Radio + TV*Radio, data=ads) ; summary(SalesTVRadioInt.lm)
+
+# Investigating every possible interaction in the model
+SalesAll.lm2 <- lm(Sales~.^2, data = ads) ; summary(SalesAll.lm2)
+cat("R^2 for model with no Interaction terms =", summary(SalesAll.lm)$r.sq, 
+    "\nR^2 for model with all Interaction terms ", summary(SalesAll.lm2)$r.sq)
+
+
 ######### Sec 3.6.2 Simple Linear Regression ################################
 options(show.signif.stars=T)      # if False, removes the stars from regression output showing significance
 lm(medv~lstat, data = Boston)
@@ -698,12 +830,12 @@ legend(x=0.4, y=80, c("Linear Rregression", "Multiple Regression Deg 2", "Multip
 str(Default)
 # evaluate visually if balance has a relationship with income, being default, or being a student
 boxplot(Default$balance ~ Default$default)    # quick comparison of balance data for default yes and no
-Default %>% 
-  ggplot(aes(x = income, 
+Default %>%
+  ggplot(aes(x = income,
              y = balance,
              color = default)) +
   geom_point() +
-  facet_wrap(~ student, ncol = 2)+
+  facet_wrap( ~ student, ncol = 2) +
   theme_classic()
 
 # logistic regression for default vs binary of being student - create dummy variable first (although this is not necessary)
@@ -713,6 +845,9 @@ Default %>%
 # run the regression model via generalized linear model, binomial is used for logit function
 lm.fit = glm(Default$default ~ Default$student, family = "binomial")
 summary(lm.fit)
+
+
+
 
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
