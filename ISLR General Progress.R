@@ -8,11 +8,8 @@ if (!require("GGally")) install.packages("GGally")
 
 if (!require("ggplot2")) install.packages("ggplot2")
 # once a lib with data is loaded, R knows the dataset and can work on it, e.g. when ISLR is loaded, the Auto dataset is available for use
-library(ISLR)
-library(tidyverse)
-library(MASS)
 library(GGally, include.only = 'ggpairs') # include only one function from GGally (in this case, the function needs ggplot2 to be loaded too)
-
+lapply(c("MASS", "tidyverse", "ISLR", "car"), require, character.only = T) # to load multiple packages at once
 
 ######### ISLR BOOK Specific Progress ########
 AutoData = Auto # store the Auto dataset from ISLR package into a dataframe
@@ -257,7 +254,7 @@ summary(baleth.lm)
 
 
 ####@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-######### Chapter 2 - Exercise 9  - Additional work with auto data ########
+######### Ch 2 - Ex 9  - Additional work with auto data ########
 range(AutoData[,1]) # range of a numerical continuous (quantitative) variable
 lapply(AutoData[,c(1,3:7)], range) # getting the range of values for only quantitative variables (lapply error if factors are included)
 sapply(AutoData[,c(1,3:7)], range) # does the same as lapply but in a vector form than as a list form (in lapply)
@@ -292,7 +289,7 @@ dev.off()
 
 
 ####@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-######### Chapter 2 - Exercise 8  - work with college data ########
+######### Ch 2 - Ex 8  - work with college data ########
 library(ISLR) 
 ?College # see what the variables are and get to know about the dataset
 collegedata <- College
@@ -582,7 +579,7 @@ contrasts(ShelveLoc)
 
 
 ####@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-######### Chapter 3 - Exercise 8  - Additional work with auto data ########
+######### Ch 3 - Ex 8  - Additional work with auto data ########
 str(Auto)
 attach(Auto)
 plot(Auto$mpg ~ horsepower)
@@ -596,7 +593,7 @@ predict(lm.fit,
 points(x = 98, y=24.47, pch = "*", cex = 5, col = "red")
 par(mfrow=c(2,2)) ; plot(lm.fit) ; par(mfrow=c(1,1))
 
-######### Chapter 3 - Exercise 9  - Continue on 8 ########
+######### Ch 3 - Ex 9  - Continue on 8 ########
 Auto %>% 
       select(-name, -cylinders, -origin, -year) %>% 
       pairs()
@@ -653,7 +650,7 @@ lm.fit <- lm(mpg ~ . -name +
                    data = Auto); summary(lm.fit)
 
 
-######### Chapter 3 - Exercise 10  - Carseats Regression ########
+######### Ch 3 - Ex 10  - Carseats Regression ########
 names(Carseats)
 attach(Carseats)
 # visualizing price vs binaries of Urban and US
@@ -690,7 +687,7 @@ par(mfrow=c(2,2)) ; plot(lm.fit) ; par(mfrow=c(1,1))
 # confidence intervals for the coefficients
 confint(lm.fit, level = 0.95)
 
-######### Chapter 3 - Exercise 11  - t-Statistics Investigation ########
+######### Ch 3 - Ex 11  - t-Statistics Investigation ########
 set.seed(1)
 x = rnorm(100)
 y = 2*x + rnorm(100)
@@ -712,7 +709,7 @@ plot(x = x, y = y) ; abline(lm.fit) ; points(x = 0, y = summary(lm.fit)$coeffici
 lm.fit = lm(x ~ y) ; summary(lm.fit)
 plot(x = y, y = x) ; abline(lm.fit) ; points(x = 0, y = summary(lm.fit)$coefficients[1,1], pch = 19, col  ="Red", cex = 1.5)
 
-######### Chapter 3 - Exercise 12.c ########
+######### Ch 3 - Ex 12.c ########
 # for the y~x and x~y to have the same coefficients, one should be a permutation of the other one 
 # this is to make sure the SSX and SSY won't change (in coeff calculations) as the model order changes
 set.seed(15) ; x = rnorm(10) 
@@ -721,7 +718,7 @@ df <- data.frame(x, y)
 lm.fit = lm(y~x) ; summary(lm.fit) ; plot(x = x, y = y)
 lm.fit = lm(x~y) ; summary(lm.fit) ; plot(x = y, y = x)
 
-######### Chapter 3 - Exercise 13 ########
+######### Ch 3 - Ex 13 ########
 set.seed(1)
 x <- rnorm(100)
 eps <- rnorm(100, mean = 0, sd = 0.25)
@@ -763,7 +760,7 @@ lessnoiseconfint = confint(lm.fit)
 confintcomparison = cbind(lessnoiseconfint, midnoiseconfint, morenoiseconfint)
 colnames(confintcomparison) = c("LL @ Low noise", "UL @ Low Noise", "LL @ Mid noise", "UL @ Mid Noise", "LL @ High noise", "UL @ High Noise")
 
-######### Chapter 3 - Exercise 14 ########
+######### Ch 3 - Ex 14 ########
 set.seed(1)
 x1 = runif(100)
 x2 = 0.5*x1 + rnorm(100)/10
@@ -778,7 +775,7 @@ x2 = c(x2, 0.8)
 y = c(y, 6)
 par(mfrow=c(2,2)) ; plot(lm.fit) ; par(mfrow=c(1,1))
 
-######### Chapter 3 - Exercise 15 ########
+######### Ch 3 - Ex 15 ########
 # part a
 y <- Boston$crim                  # store response into y variable
 CoeffData = data.frame()          # create an empty dataframe to store regression coefficients and their significance levels
@@ -826,8 +823,10 @@ curve(3.6135 + 81.3720*x -28.8286*x^2, from=min(Boston$nox), to=max(Boston$nox),
 curve(3.6135 + 81.3720*x -28.8286*x^2 -60.3619*x^3, from=min(Boston$nox), to=max(Boston$nox), col = "green", add = T)
 legend(x=0.4, y=80, c("Linear Rregression", "Multiple Regression Deg 2", "Multiple Regression Deg 3"), cex=0.9, fill = c(c("red","blue", "green")))
 
-######### Chapter 4 - Default Data - Logistic Regression ##############
+######### Ch 4 - Logistic Regression ##############
+# Using Default Data to work on
 str(Default)
+
 # evaluate visually if balance has a relationship with income, being default, or being a student
 boxplot(Default$balance ~ Default$default)    # quick comparison of balance data for default yes and no
 Default %>%
@@ -840,13 +839,52 @@ Default %>%
 
 # logistic regression for default vs binary of being student - create dummy variable first (although this is not necessary)
 # Default <- Default %>% 
-#   mutate(binarystudent = if_else(student == "Yes", 1, 0)) 
+# mutate(binarystudent = if_else(student == "Yes", 1, 0)) 
 
 # run the regression model via generalized linear model, binomial is used for logit function
 lm.fit = glm(Default$default ~ Default$student, family = "binomial")
 summary(lm.fit)
 
+# Ch 4 - Multiple Logistic Regression
+lm.fit = glm(Default$default ~ Default$student + Default$income + Default$balance, family = "binomial")
+summary(lm.fit)
 
+######### Sec 4.6.1 - Stock Market Data ##############
+glimpse(Smarket)
+head(Smarket)
+summary(Smarket)
+cor(Smarket[,-9]) # all columsn but remove the 9th col which is a factor
+library("ggcorrplot")
+Smarket[,-9] %>%
+     cor() %>% 
+     round(2) %>% 
+     ggcorrplot(hc.order = TRUE, 
+                type = "lower", 
+                lab = TRUE, 
+                lab_size = 3, 
+                method="square",     # can use circle instead
+                colors = c("tomato", "white", "darkgreen"), 
+                title="Correlogram", 
+                ggtheme=theme_bw)
+
+boxplot(Smarket$Volume ~ Smarket$Year) # since there was a 0.5 cor for volume and year
+plot(Smarket$Volume)
+
+######### Sec 4.6.2 - Logistic Reg on Stock Market ##############
+logism.fit <- glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, data = Smarket, family = "binomial") # binomial is used for logit function
+summary(logism.fit)
+coef(logism.fit)                   # Extracting coefficients of the model only
+summary(logism.fit)$coef[2,4]      # Extracting a specific p-value of the model - lag1 in this case
+
+# to predict the probability of market going up, given values of the predictors. 
+# type = "response" is sued to get the predicted probabilities P(Y=1|X) as opposed to other outputs (e.g. logit)
+glm.probs = predict(logism.fit, type = "response") # predicting probabilities for the training set (since no test set is provided)
+head(glm.probs)
+contrasts(Smarket$Direction)  # to see what R will use as 0 and 1, in this case Up is 1, so the probabilities are for market going up.
+
+glm.preds = rep("Down", 1250)           # a vector of all "Down" of size of data
+glm.preds[glm.probs > 0.5] = "Up"       # where predicted probability is more than 0.5 change it to up 
+table(glm.preds, Smarket$Direction)     # a confusion table that shows how many are predicted truly or falsely (see the two types of error)
 
 
 
