@@ -853,7 +853,7 @@ summary(lm.fit)
 glimpse(Smarket)
 head(Smarket)
 summary(Smarket)
-cor(Smarket[,-9]) # all columsn but remove the 9th col which is a factor
+cor(Smarket[,-9]) # all columns but remove the 9th col which is a factor
 library("ggcorrplot")
 Smarket[,-9] %>%
      cor() %>% 
@@ -870,7 +870,7 @@ Smarket[,-9] %>%
 boxplot(Smarket$Volume ~ Smarket$Year) # since there was a 0.5 cor for volume and year
 plot(Smarket$Volume)
 
-######### Sec 4.6.2 - Logistic Reg on Stock Market ##############
+######### Sec 4.6.2 - Logistic on Stock Market ##############
 logism.fit <- glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, data = Smarket, family = "binomial") # binomial is used for logit function
 summary(logism.fit)
 coef(logism.fit)                   # Extracting coefficients of the model only
@@ -885,6 +885,188 @@ contrasts(Smarket$Direction)  # to see what R will use as 0 and 1, in this case 
 glm.preds = rep("Down", 1250)           # a vector of all "Down" of size of data
 glm.preds[glm.probs > 0.5] = "Up"       # where predicted probability is more than 0.5 change it to up 
 table(glm.preds, Smarket$Direction)     # a confusion table that shows how many are predicted truly or falsely (see the two types of error)
+mean(glm.preds == Smarket$Direction)    # the fraction of correct predictions out of total, 1 - which = training error rate
+
+# Trying to train on train set and then test on test set
+TrainIndex <- (Smarket$Year < 2005)     # taking years 2001-2004 as training st
+SmarketTrain <- Smarket[TrainIndex, ]   # for modeling this is not needed due to using Train Index as subset in the model command
+SmarketTest = Smarket[!TrainIndex, ]    
+dim(SmarketTrain)
+dim(SmarketTest)
+
+logism.fit = glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, 
+                 data = Smarket, 
+                 subset = TrainIndex,
+                 family = "binomial")
+
+glm.probs = predict(logism.fit, 
+                    newdata = SmarketTest,
+                    type = "response")
+length(glm.probs)
+glm.preds = rep("Down", 252)
+glm.preds[glm.probs > 0.5] <- "Up"
+table(glm.preds, SmarketTest$Direction)
+mean(glm.preds != SmarketTest$Direction)     # test error rate
+
+
+# trying it with those variables with lowest p-value from original model
+logism.fit = glm(Direction ~ Lag1 + Lag2, 
+                data = Smarket, 
+                subset = TrainIndex,
+                family = "binomial")
+
+glm.probs = predict(logism.fit, 
+                    newdata = SmarketTest,
+                    type = "response")
+
+contrasts(Smarket$Direction)  # to see the dummy variables for up and down
+glm.preds = rep("Down", 252)
+glm.preds[glm.probs > 0.5] <- "Up"
+table(glm.preds, SmarketTest$Direction)
+mean(glm.preds != SmarketTest$Direction)
+
+# to predict a particular case where there is a specific lag1 and lag2 values
+summary(logism.fit)
+predict(logism.fit, newdata = data.frame(
+     Lag1 = c(1.2, 1.5),
+     Lag2 = c(1.1, -0.8)
+     ),
+     type = "response")
+
+######### Sec 4.6.3 - LDA on Stock Market ##############
+# using the same train and test data from before
+lda.fit = lda(Direction ~ Lag1 + Lag2, 
+              data = Smarket, 
+              subset = TrainIndex)
+lda.fit
+
+# "The LDA output indicates that ˆπ1 = 0.492 and ˆπ2 = 0.508; in other words,
+# 49.2 % of the training observations correspond to days during which the market went down. 
+# It also provides the group means; these are the average of each predictor within each class, and are used by LDA as estimates of μk."
+
+# "The coefficients of linear discriminants output provides the linear
+# combination of Lag1 and Lag2 that are used to form the LDA decision rule.
+# If −0.642×Lag1 − 0.514×Lag2 is large, then the LDA classifier will
+# predict a market increase, and if it is small, 
+# then the LDA classifier will predict a market decline."
+
+plot(lda.fit)
+
+lda.pred = predict(lda.fit, SmarketTest) 
+names(lda.pred)
+# class is the prediction, 
+# posterior is a matrix with k columns (classes of response), each column contains the probability that the observation belongs to that class.
+# x has the linear discriminants
+head(lda.pred$posterior)
+head(lda.pred$x)
+table(lda.pred$class, SmarketTest$Direction)      # when compared with logistic reg output, they're almost the same.
+sum(lda.pred$posterior[,2] > 0.5)                 # total number of predictions for up, which should be seen in the class element of prediction dataframe
+sum(lda.pred$posterior[,2] > 0.9)                 # total number of predictions for up when our threshold is based on 90% probability that observation falls in Up class
+
+
+######### Sec 4.6.4 - QDA on Stock Market ##############
+# using the same train and test data from before
+options(digits = 4)
+TrainIndex <- (Smarket$Year < 2005)          # taking years 2001-2004 as training st
+SmarketTest = Smarket[!TrainIndex, ]
+qda.fit = qda(Direction ~ Lag1 + Lag2, 
+              data = Smarket, 
+              subset = TrainIndex)
+
+qda.fit
+qda.pred = predict(qda.fit, SmarketTest)     # predicting values from test sample
+names(qda.pred)
+head(qda.pred$class, 20)
+t(head(qda.pred$posterior, 20))
+# class is the prediction, 
+# posterior is a matrix with k columns (classes of response), each column contains the probability that the observation belongs to that class.
+
+table(qda.pred$class, SmarketTest$Direction)      # when compared with logistic reg output, they're almost the same.
+mean(qda.pred$class == SmarketTest$Direction)     # percent of true positive prediction
+
+
+######### Sec 4.6.5 - KNN on Stock Market ##############
+# Needs library(class) and 4 inputs: training data, test data, responses for train data, and value of K
+library(class)
+TrainIndex <- (Smarket$Year < 2005)          # taking years 2001-2004 as indices for extracting training set
+SmarketTrain = Smarket[TrainIndex, 2:3]      # making the training set with only the first two variables
+SmarketTest = Smarket[!TrainIndex, 2:3]      # making the test set with only the first two variables
+SmarketTrainResponse = Smarket$Direction[TrainIndex]   # making the response vector for the training set
+
+# if several observations are tied as nearest neighbors, R randomly breaks the tie - so let's use a seed for reproducibility purposes
+set.seed(1)
+knn.pred = knn(SmarketTrain, SmarketTest, SmarketTrainResponse, k = 3) # using various K values, we will see what works best
+SmarketTestDirection <- Smarket$Direction[!TrainIndex]
+table(knn.pred, SmarketTestDirection)
+mean(knn.pred == SmarketTestDirection)
+
+
+######### Sec 4.6.6 - KNN on Caravan Insurance ##############
+glimpse(Caravan)
+attach(Caravan)
+summary(Purchase)
+# because the KNN is influenced by the scale of the variables, we first need to standardize the predictors we have so they'll all have a mean of 0 and sd of 1.
+Caravan.St = scale(Caravan[ , -86])          # standardize all predictors and leave the response off (dataframe to matrix)
+view(Caravan.St, n=10)
+
+# let's compare some variance and means
+library(psych)      # to use the describe function for descriptive stats
+describe(Caravan[, 1:4])
+describe(Caravan.St[, 1:4])
+t(lapply(Caravan[, 1:4], var))
+t(lapply(data.frame(Caravan.St[, 1:4]), var))
+
+# creating a train and test set
+TestIndex = 1:1000
+Caravan.Train = Caravan.St[-TestIndex,]
+Caravan.Test = Caravan.St[TestIndex,]
+Caravan.Train.Response = Purchase[-TestIndex]
+Caravan.Test.Response = Purchase[TestIndex]
+
+dim(Caravan.Test)
+dim(Caravan.Train)
+length(Purchase)
+Purchase[1:1000,]
+
+# fitting the KNN fit to train set and testing it on the test set
+set.seed(1)
+knn.pred = knn(Caravan.Train, Caravan.Test, Caravan.Train.Response, k=1)
+table(knn.pred, Caravan.Test.Response)
+mean(Caravan.Test.Response != knn.pred)      # error rate = percentage predicted incorrectly 
+mean(Caravan.Test.Response == "Yes")         # percent of yes in the test response
+
+# 11.8% overall error rate too high, if all were predicted No, error would have been just 5.9% - but is this of interest in this analysis?
+# Interest here is the percent of those who are truly predicted as a Yes (to spend money/effort to sell them insurance), which is 9/(9+68) = 11.7%
+# the 11.7% true out of total positive prediction is the interest here. Model predicted 68 (false positive) + 9 (true positive). This is double the random guessing rate
+# This page was interesting on this subject: https://classeval.wordpress.com/introduction/basic-evaluation-measures/
+
+# Lets try k = 3 and higher (with k = 5, the success of positive response prediction is a lot higher than random)
+set.seed(1)
+knn.pred = knn(Caravan.Train, Caravan.Test, Caravan.Train.Response, k=5)
+table(knn.pred, Caravan.Test.Response)
+mean(Caravan.Test.Response != knn.pred)      # error rate = percentage predicted incorrectly 
+mean(Caravan.Test.Response == "Yes")         # percent of yes in the test response
+
+# for comparison, let's fit a logistic model to this data
+logism.fit = glm(Purchase ~ ., 
+                 data = Caravan, 
+                 subset = -TestIndex,
+                 family = binomial)
+
+glm.probs = predict(logism.fit, 
+                    newdata = Caravan[TestIndex,],
+                    type = "response")
+length(glm.probs)
+contrasts(Purchase)
+glm.preds = rep("No", 1000)
+glm.preds[glm.probs > 0.5] <- "Yes"
+table(glm.preds, Purchase[TestIndex])
+mean(glm.preds != Purchase[TestIndex])     # total test error rate better than KNN but doesn't matter much really! although, still higher than random
+
+# what of we change the probability of Yes to higher than 0.25 instead of 0.5 - it makes a big difference 11/33 as compared to random: 5.9%
+glm.preds = rep("No", 1000)
+glm.preds[glm.probs > 0.25] <- "Yes"
+table(glm.preds, Purchase[TestIndex])
 
 
 
