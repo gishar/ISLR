@@ -9,7 +9,7 @@ if (!require("GGally")) install.packages("GGally")
 if (!require("ggplot2")) install.packages("ggplot2")
 # once a lib with data is loaded, R knows the dataset and can work on it, e.g. when ISLR is loaded, the Auto dataset is available for use
 library(GGally, include.only = 'ggpairs') # include only one function from GGally (in this case, the function needs ggplot2 to be loaded too)
-lapply(c("MASS", "tidyverse", "ISLR", "car"), require, character.only = T) # to load multiple packages at once
+lapply(c("MASS", "tidyverse", "ISLR", "car", "ggcorrplot"), require, character.only = T) # to load multiple packages at once
 
 ######### ISLR BOOK Specific Progress ########
 AutoData = Auto # store the Auto dataset from ISLR package into a dataframe
@@ -871,14 +871,17 @@ boxplot(Smarket$Volume ~ Smarket$Year) # since there was a 0.5 cor for volume an
 plot(Smarket$Volume)
 
 ######### Sec 4.6.2 - Logistic on Stock Market ##############
-logism.fit <- glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, data = Smarket, family = "binomial") # binomial is used for logit function
+logism.fit <- glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, 
+                  data = Smarket, 
+                  family = "binomial") # binomial is used for logit function
 summary(logism.fit)
 coef(logism.fit)                   # Extracting coefficients of the model only
 summary(logism.fit)$coef[2,4]      # Extracting a specific p-value of the model - lag1 in this case
 
 # to predict the probability of market going up, given values of the predictors. 
 # type = "response" is sued to get the predicted probabilities P(Y=1|X) as opposed to other outputs (e.g. logit)
-glm.probs = predict(logism.fit, type = "response") # predicting probabilities for the training set (since no test set is provided)
+glm.probs = predict(logism.fit, 
+                    type = "response") # predicting probabilities for the training set (since no test set is provided)
 head(glm.probs)
 contrasts(Smarket$Direction)  # to see what R will use as 0 and 1, in this case Up is 1, so the probabilities are for market going up.
 
@@ -1067,6 +1070,141 @@ mean(glm.preds != Purchase[TestIndex])     # total test error rate better than K
 glm.preds = rep("No", 1000)
 glm.preds[glm.probs > 0.25] <- "Yes"
 table(glm.preds, Purchase[TestIndex])
+
+######### Ch 4 - Ex 10 ########
+view(Weekly)
+attach(Weekly)
+glimpse(Weekly)
+summary(Weekly)
+
+# Part a
+# see how Lag1 to Lag5 changed over time
+par(mfrow = c(2,3))
+for (i in 2:6) {
+     plot(Weekly[,i])
+}
+par(mfrow = c(1,1))
+
+# see pairwise scatter plot of lag1 to lag 5
+pairs(Weekly[, 2:6])
+
+# see correlation between all predictor variables
+library(ggplot2)
+Weekly[,-9] %>%
+     cor() %>% 
+     round(3) %>% 
+     ggcorrplot(hc.order = TRUE, 
+                type = "lower", 
+                lab = TRUE, 
+                lab_size = 3, 
+                method="square",     # can use circle instead
+                colors = c("tomato", "white", "darkgreen"), 
+                title="Correlogram", 
+                ggtheme=theme_bw)
+
+# another approach to see all the above in the same graph
+library(psych)
+pairs.panels(Weekly[, 2:8],
+             smooth = TRUE,      # If TRUE, draws less smooths
+             scale = FALSE,      # If TRUE, scales the correlation text font
+             density = TRUE,     # If TRUE, adds density plots and histograms
+             ellipses = TRUE,    # If TRUE, draws ellipses
+             method = "pearson", # Correlation method (also "spearman" or "kendall")
+             pch = 21,           # pch symbol
+             lm = FALSE,         # If TRUE, plots linear fit rather than the LOESS (smoothed) fit
+             cor = TRUE,         # If TRUE, reports correlations
+             jiggle = FALSE,     # If TRUE, data points are jittered
+             factor = 2,         # Jittering factor
+             hist.col = 4,       # Histograms color
+             stars = TRUE,       # If TRUE, adds significance level with stars
+             ci = TRUE)          # If TRUE, adds confidence intervals
+
+# Part b - Logistic model using all data
+logistic.fit = glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, 
+                   data = Weekly,
+                   family = binomial)
+summary(logistic.fit)
+logistic.prob = predict(logistic.fit,             # Output of logistic predictions are probabilities of outcome being a yes or a 1
+                        newdata = Weekly,
+                        type = "response")
+# Part c
+contrasts(Direction)                              # this shows up is 1, so a prediction with probability of Direction > 0.5 is an "Up" value
+Direction.pred = rep("Down", nrow(Weekly))
+Direction.pred[logistic.prob > 0.5] <- "Up"
+table(Direction.pred, Direction)
+mean(Direction.pred == Direction)
+
+
+# Part d - Logistic model using training and test data @@@@@@@@@@@@@@@@
+unique(Weekly$Year)
+TrainIndex = Year <= 2008
+logistic.fit = glm(Direction ~ Lag2,
+                   data = Weekly,
+                   subset = TrainIndex,           # index is used to define the subset from the data
+                   family = binomial)
+summary(logistic.fit)
+
+logistic.prob = predict(logistic.fit, 
+                    newdata = Weekly[!TrainIndex, ],
+                    type = "response")
+
+Direction.pred.logistic = rep("Down", nrow(Weekly[!TrainIndex, ]))
+Direction.pred.logistic[logistic.prob > 0.5] <- "Up"
+table(Direction.pred.logistic, Direction[!TrainIndex])
+mean(Direction.pred.logistic == Direction[!TrainIndex])
+(logistic.error.rate = mean(Direction.pred.logistic != Direction[!TrainIndex]))   # total error rate
+
+
+# Part e - LDA model @@@@@@@@@@@@@@@@
+LDA.fit = lda(Direction ~ Lag2,
+              data = Weekly,
+              subset = TrainIndex)
+LDA.fit
+Direction.pred.LDA = predict(LDA.fit, 
+                             newdata = Weekly[!TrainIndex, ]) 
+table(Direction.pred.LDA$class)
+table(Direction.pred.LDA$class, Direction[!TrainIndex])
+mean(Direction.pred.LDA$class == Direction[!TrainIndex])
+(LDA.error.rate = mean(Direction.pred.LDA$class != Direction[!TrainIndex]))   # total error rate
+
+
+# Part f - QDA model @@@@@@@@@@@@@@@@
+QDA.fit = qda(Direction ~ Lag2,
+              data = Weekly,
+              subset = TrainIndex)
+QDA.fit
+Direction.pred.QDA = predict(QDA.fit, 
+                             newdata = Weekly[!TrainIndex, ]) 
+table(Direction.pred.QDA$class)
+table(Direction.pred.QDA$class, Direction[!TrainIndex])
+mean(Direction.pred.QDA$class == Direction[!TrainIndex])
+(QDA.error.rate = mean(Direction.pred.QDA$class != Direction[!TrainIndex]))   # total error rate
+
+# Part g - KNN model @@@@@@@@@@@@@@@@
+library(class)
+Weekly.Train.Set = matrix(Weekly[TrainIndex, 3])      # making the training set with only the Lag2 variable (KNN only takes dataframe or matrix as input)
+Weekly.Test.Set = matrix(Weekly[!TrainIndex, 3])      # making the test set with only the Lag2 variable
+Weekly.Train.Response = Weekly$Direction[TrainIndex]   # making the response vector for the training set
+Weekly.Test.Response = Weekly$Direction[!TrainIndex]
+
+set.seed(100)
+Direction.Pred.KNN = knn(train =  Weekly.Train.Set, 
+                         test = Weekly.Test.Set, 
+                         cl = Weekly.Train.Response, 
+                         k = 1)
+
+table(Direction.Pred.KNN, Weekly.Test.Response)
+mean(Direction.Pred.KNN == Weekly.Test.Response)
+(KNN.error.rate = mean(Direction.Pred.KNN != Weekly.Test.Response))
+
+# Part h
+Error.rate =data.frame('Logistic Error Rate' = logistic.error.rate,
+                       'LDA Error Rate' = LDA.error.rate,
+                       'QDA Error Rate' = QDA.error.rate,
+                       'KNN-1 Error Rate' = KNN.error.rate)
+
+# Part i - Skipped them
+
 
 
 
