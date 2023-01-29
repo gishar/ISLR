@@ -9,7 +9,8 @@ if (!require("GGally")) install.packages("GGally")
 if (!require("ggplot2")) install.packages("ggplot2")
 # once a lib with data is loaded, R knows the dataset and can work on it, e.g. when ISLR is loaded, the Auto dataset is available for use
 library(GGally, include.only = 'ggpairs') # include only one function from GGally (in this case, the function needs ggplot2 to be loaded too)
-lapply(c("MASS", "tidyverse", "ISLR", "car", "ggcorrplot"), require, character.only = T) # to load multiple packages at once
+lapply(c("MASS", "tidyverse", "ISLR", "car", "ggcorrplot", "psych", "class"), 
+       require, character.only = T) # to load multiple packages at once
 
 ######### ISLR BOOK Specific Progress ########
 AutoData = Auto # store the Auto dataset from ISLR package into a dataframe
@@ -930,11 +931,12 @@ mean(glm.preds != SmarketTest$Direction)
 
 # to predict a particular case where there is a specific lag1 and lag2 values
 summary(logism.fit)
-predict(logism.fit, newdata = data.frame(
-     Lag1 = c(1.2, 1.5),
-     Lag2 = c(1.1, -0.8)
-     ),
-     type = "response")
+predict(logism.fit, 
+        newdata = data.frame(
+             Lag1 = c(1.2, 1.5),
+             Lag2 = c(1.1, -0.8)
+             ),
+        type = "response")
 
 ######### Sec 4.6.3 - LDA on Stock Market ##############
 # using the same train and test data from before
@@ -1205,9 +1207,301 @@ Error.rate =data.frame('Logistic Error Rate' = logistic.error.rate,
 
 # Part i - Skipped them
 
+######### Ch 4 - Ex 11 ########
+# Part a
+AutoData <- Auto %>% 
+     mutate(mpg01 = if_else(mpg > median(Auto$mpg), 1, 0))
+
+# or another way to do the above
+Auto$mpg01[Auto$mpg > median(Auto$mpg)] = 1
+Auto$mpg01[Auto$mpg <= median(Auto$mpg)] = 0
+
+# Part b
+library(psych)
+pairs.panels(AutoData[,],
+             smooth = TRUE,      # If TRUE, draws less smooths
+             scale = FALSE,      # If TRUE, scales the correlation text font
+             density = TRUE,     # If TRUE, adds density plots and histograms
+             ellipses = TRUE,    # If TRUE, draws ellipses
+             method = "pearson", # Correlation method (also "spearman" or "kendall")
+             pch = 21,           # pch symbol
+             lm = FALSE,         # If TRUE, plots linear fit rather than the LOESS (smoothed) fit
+             cor = TRUE,         # If TRUE, reports correlations
+             jiggle = FALSE,     # If TRUE, data points are jittered
+             factor = 2,         # Jittering factor
+             hist.col = 4,       # Histograms color
+             stars = TRUE,       # If TRUE, adds significance level with stars
+             ci = TRUE)          # If TRUE, adds confidence intervals
+
+par(mfrow = c(2, 4))
+plot(AutoData$horsepower, AutoData$mpg01)
+plot(AutoData$weight, AutoData$mpg01)
+plot(AutoData$displacement, AutoData$mpg01)
+plot(AutoData$acceleration, AutoData$mpg01)
+
+boxplot(AutoData$horsepower ~ AutoData$mpg01)
+boxplot(AutoData$weight~ AutoData$mpg01)
+boxplot(AutoData$displacement~ AutoData$mpg01)
+boxplot(AutoData$acceleration~ AutoData$mpg01)
+par(mfrow = c(1, 1))
+
+# Part c - Create sample data
+# create a vector with the size of number of records in the dataframe, 90% of values are True and 10% False randomly assigned, to be used as index
+TrainIndex = sample(c(TRUE, FALSE), nrow(AutoData), replace = T, prob = c(0.9, 0.1))      
+TrainData = AutoData[TrainIndex,]       # just for the heck of it. subset command is used in the modeling
+TestData = AutoData[!TrainIndex,]
+
+# Part d
+LDA.fit = lda(mpg01 ~ horsepower + weight + displacement + acceleration, 
+              data = AutoData, 
+              subset = TrainIndex)
+
+LDA.fit
+lda.pred = predict(LDA.fit, TestData) 
+lda.pred$class
+table('LDA prediction' =lda.pred$class, observation = TestData$mpg01)
+LDA.error.rate <- mean(TestData$mpg01 !=lda.pred$class)
+
+# Part e
+QDA.fit = qda(mpg01 ~ horsepower + weight + displacement + acceleration, 
+              data = AutoData, 
+              subset = TrainIndex)
+QDA.fit
+qda.pred = predict(QDA.fit, 
+                   newdata = TestData) 
+qda.pred$class
+table('QDA prediction' =qda.pred$class, observation = TestData$mpg01)
+QDA.error.rate <- mean(TestData$mpg01 !=qda.pred$class)
+
+
+# Part f
+logistic.fit = glm(mpg01 ~ horsepower + weight + displacement + acceleration, 
+                   data = AutoData,
+                   subset = TrainIndex,
+                   family = binomial)
+summary(logistic.fit)
+
+par(mfrow = c(2,2))
+plot(logistic.fit)
+par(mfrow = c(1,1))
+
+logistic.prob = predict(logistic.fit, 
+                        newdata = TestData,
+                        type = "response")
+
+logistic.pred = rep(0, times = nrow(TestData))
+logistic.pred[logistic.prob > 0.5] = 1
+table('logistic prediction'= logistic.pred, 'Observation' = TestData$mpg01)
+(logistic.error.rate = mean(logistic.pred != TestData$mpg01))
+
+# Part g
+TrainAuto = AutoData[TrainIndex, 3:6]
+TrainResponce = AutoData[TrainIndex, 10]
+TestAuto = AutoData[!TrainIndex, 3:6]
+
+KNN1.fit = knn(TrainAuto, TestAuto, TrainResponce, k = 1)
+table('KNN prediction'= KNN1.fit, 'Observation' = TestData$mpg01)
+(KNN1.error.rate = mean(KNN1.fit != TestData$mpg01))
+
+KNN2.fit = knn(TrainAuto, TestAuto, TrainResponce, k = 2)
+(KNN2.error.rate = mean(KNN2.fit != TestData$mpg01))
+
+KNN3.fit = knn(TrainAuto, TestAuto, TrainResponce, k = 3)
+(KNN3.error.rate = mean(KNN3.fit != TestData$mpg01))
+
+KNN4.fit = knn(TrainAuto, TestAuto, TrainResponce, k = 4)
+(KNN4.error.rate = mean(KNN4.fit != TestData$mpg01))
+
+options(digits = 4)
+Error.rate =data.frame('Logistic Error Rate' = logistic.error.rate * 100,
+                       'LDA Error Rate' = LDA.error.rate * 100,
+                       'QDA Error Rate' = QDA.error.rate * 100,
+                       'KNN-1 Error Rate' = KNN1.error.rate * 100,
+                       'KNN-2 Error Rate' = KNN2.error.rate * 100,
+                       'KNN-3 Error Rate' = KNN3.error.rate * 100,
+                       'KNN-4 Error Rate' = KNN4.error.rate * 100)
+
+t(Error.rate)
+
+######### Ch 4 - Ex 12 ########
+# Part a
+Power = function() {
+     show(2^3)
+}
+Power()
+
+# Part b
+Power2 = function(a, b){
+     show(a^b)
+}
+Power2(4, 5)
+
+# Part c
+Power2(10, 3)
+
+# Part d
+Power3 = function(a, b){
+     result = a ^ b
+     return(result)
+}
+Power3(10, 3)
+
+# Part e
+x = 1:10
+y = Power3(x, 2)
+
+par(mfrow = c(2,2))
+plot(x, y, main = "Plot of Y = x^2")
+plot(x, y, main = "Plot of Y = x^2 on log-x axis", log = 'x')
+plot(x, y, main = "Plot of Y = x^2 on log-y axis", log = 'y')
+plot(x, y, main = "Plot of Y = x^2 on log-x and log-y axes", log = 'xy')
+par(mfrow = c(1,1))
+
+# Part f
+PlotPower = function(a, b){
+     result = x^b
+     return(plot(x, result))
+}
+
+x=-10:10
+PlotPower(x, 3)
+
+######### Ch 4 - Ex 13 ########
+# taking a look around the data
+Boston = Boston
+attach(Boston)
+summary(crim)
+options(scipen = 100)
+boxplot(crim, log = 'y')
+view(sort(crim))
+
+# create a binary crim variable calling it crim01
+Boston$crim01[crim > median(crim)] = 1
+Boston$crim01[crim < median(crim)] = 0
+glimpse(Boston)
+attach(Boston)
+
+# looking at correlation of variables and crim01
+Boston %>% 
+     cor() %>% 
+     round(2) %>% 
+     ggcorrplot(hc.order = TRUE, 
+                type = "lower", 
+                lab = TRUE, 
+                lab_size = 3, 
+                method="square",     # can use circle instead
+                colors = c("tomato", "white", "darkgreen"), 
+                title="Correlogram of mtcars", 
+                ggtheme=theme_bw)
+
+# looking at those with 0.6+ correlation only
+cor(data.frame(crim01, rad, tax, age, indus, nox, dis))
+
+# tax and rad have a high correlation. A scatter plot of those two shows it's not a real correlation and something is going on!
+# seems about 26% of records are standing farther away from the rest with much higher tax rate, near or far from radial highways
+# after removing those seemingly outliers, correlation between rad and tax drops to 19% - both will be included in the analaysis
+plot(tax, rad)
+ggplot(Boston, aes(tax, rad)) +
+     geom_jitter(width = 2, 
+                 size=0.5,
+                 color = "blue") +
+     labs(title="Jittered plot of tax and rad",
+          y="Vicinity to Radial Highways", 
+          x="Tax rate per $10,000")
+
+test <- data.frame(cbind(tax, rad))
+test <- test[test$rad < 10 | test$tax < 500, ]
+cor(test)
+rm(test)
+Boston <- data.frame(crim01, rad, tax, age, indus, nox, dis)
+attach(Boston)
 
 
 
+
+
+
+
+# Create sample data
+# create a vector with the size of number of records in the dataframe, 90% of values are True and 10% False randomly assigned, to be used as index
+TrainIndex = sample(c(TRUE, FALSE), nrow(Boston), replace = T, prob = c(0.9, 0.1))      
+TestBoston = Boston[!TrainIndex,]
+
+# Logistic
+logistic.fit = glm(crim01 ~ rad + tax + age + indus + nox + dis, 
+                   data = Boston,
+                   subset = TrainIndex,
+                   family = binomial)
+summary(logistic.fit)
+
+par(mfrow = c(2,2))
+plot(logistic.fit)
+par(mfrow = c(1,1))
+
+logistic.prob = predict(logistic.fit, 
+                        newdata = TestBoston,
+                        type = "response")
+
+logistic.pred = rep(0, times = nrow(TestBoston))
+logistic.pred[logistic.prob > 0.5] = 1
+table('logistic prediction'= logistic.pred, 'Observation' = TestBoston$crim01)
+(logistic.error.rate = mean(logistic.pred != TestBoston$crim01))
+
+
+# LDA
+LDA.fit = lda(crim01 ~ rad + tax + age + indus + nox + dis, 
+              data = Boston,
+              subset = TrainIndex)
+LDA.pred = predict(LDA.fit, 
+                   newdata = TestBoston) 
+table('LDA prediction' =LDA.pred$class, 
+      Observation = TestBoston$crim01)
+(LDA.error.rate <- mean(TestBoston$crim01 != LDA.pred$class))
+
+# QDA
+QDA.fit = qda(crim01 ~ rad + tax + age + indus + nox + dis, 
+              data = Boston,
+              subset = TrainIndex)
+QDA.pred = predict(QDA.fit, 
+                   newdata = TestBoston) 
+table('QDA prediction' = QDA.pred$class, 
+      Observation = TestBoston$crim01)
+(QDA.error.rate <- mean(TestBoston$crim01 != QDA.pred$class))
+
+# KNN
+glimpse(Boston)
+TrainPredictorsBoston = Boston[TrainIndex, 2:length(Boston)]
+TrainResponceBoston = Boston[TrainIndex, 1]
+TestPredictorBoston = Boston[!TrainIndex, 2:length(Boston)]
+
+KNN1.fit = knn(TrainPredictorsBoston, TestPredictorBoston, TrainResponceBoston, k = 1)
+table('KNN prediction'= KNN1.fit, 'Observation' = TestBoston$crim01)
+(KNN1.error.rate = mean(KNN1.fit != TestBoston$crim01))
+
+KNN2.fit = knn(TrainPredictorsBoston, TestPredictorBoston, TrainResponceBoston, k = 2)
+table('KNN prediction'= KNN2.fit, 'Observation' = TestBoston$crim01)
+(KNN2.error.rate = mean(KNN2.fit != TestBoston$crim01))
+
+KNN3.fit = knn(TrainPredictorsBoston, TestPredictorBoston, TrainResponceBoston, k = 3)
+(KNN3.error.rate = mean(KNN3.fit != TestBoston$crim01))
+
+KNN4.fit = knn(TrainPredictorsBoston, TestPredictorBoston, TrainResponceBoston, k = 4)
+(KNN4.error.rate = mean(KNN4.fit != TestBoston$crim01))
+
+options(digits = 4)
+Error.rate =data.frame('Logistic Error Rate' = logistic.error.rate * 100,
+                       'LDA Error Rate' = LDA.error.rate * 100,
+                       'QDA Error Rate' = QDA.error.rate * 100,
+                       'KNN-1 Error Rate' = KNN1.error.rate * 100,
+                       'KNN-2 Error Rate' = KNN2.error.rate * 100,
+                       'KNN-3 Error Rate' = KNN3.error.rate * 100,
+                       'KNN-4 Error Rate' = KNN4.error.rate * 100)
+
+t(Error.rate)
+
+
+
+##### End ####
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 rm(list = ls()) ; dev.off() ; plot.new()
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
