@@ -1,6 +1,6 @@
 # Clear plots and objects
-dev.off()  # But only if there IS a plot
-rm(list = ls()) # Clear environment remove all objects
+dev.off()                # But only if there IS a plot
+rm(list = ls())          # Clear environment remove all objects
 
 ######### Loading some libraries first ####
 if (!require("ISLR")) install.packages("ISLR") # this is the package used to go along with the ISLR book
@@ -9,7 +9,7 @@ if (!require("GGally")) install.packages("GGally")
 if (!require("ggplot2")) install.packages("ggplot2")
 # once a lib with data is loaded, R knows the dataset and can work on it, e.g. when ISLR is loaded, the Auto dataset is available for use
 library(GGally, include.only = 'ggpairs') # include only one function from GGally (in this case, the function needs ggplot2 to be loaded too)
-lapply(c("MASS", "tidyverse", "ISLR", "car", "ggcorrplot", "psych", "class"), 
+lapply(c("MASS", "tidyverse", "ISLR", "car", "ggcorrplot", "psych", "class", "boot"), 
        require, character.only = T) # to load multiple packages at once
 
 ######### ISLR BOOK Specific Progress ########
@@ -584,9 +584,8 @@ contrasts(ShelveLoc)
 str(Auto)
 attach(Auto)
 plot(Auto$mpg ~ horsepower)
-lm.fit = lm(Auto$mpg ~ horsepower, data = Auto)
+lm.fit = lm(Auto$mpg ~ horsepower, data = Auto); summary(lm.fit)
 abline(lm.fit)
-summary(lm.fit)
 predict(lm.fit, 
         newdata = data.frame(horsepower = 98),
         interval = "prediction",
@@ -636,11 +635,11 @@ Auto %>%
              ci = TRUE)          # If TRUE, adds confidence intervals
 
 # multiple linear regression: mpg on all but name
-lm.fit <- lm(mpg ~ . -name, data = Auto); summary(lm.fit)
+lm.fit2 <- lm(mpg ~ . -name, data = Auto); summary(lm.fit2)
 par(mfrow=c(2,2)) ; plot(lm.fit) ; par(mfrow=c(1,1))
 
 # checking on some interaction effects and transformation of predictors
-lm.fit <- lm(mpg ~ . -name + 
+lm.fit3 <- lm(mpg ~ . -name + 
                    weight:acceleration +
                    weight:origin +
                    cylinders:weight +
@@ -648,7 +647,7 @@ lm.fit <- lm(mpg ~ . -name +
                    I(horsepower^2) +
                    log(horsepower) + 
                    sqrt(acceleration),
-                   data = Auto); summary(lm.fit)
+                   data = Auto); summary(lm.fit3)
 
 
 ######### Ch 3 - Ex 10  - Carseats Regression ########
@@ -892,7 +891,7 @@ table(glm.preds, Smarket$Direction)     # a confusion table that shows how many 
 mean(glm.preds == Smarket$Direction)    # the fraction of correct predictions out of total, 1 - which = training error rate
 
 # Trying to train on train set and then test on test set
-TrainIndex <- (Smarket$Year < 2005)     # taking years 2001-2004 as training st
+TrainIndex <- (Smarket$Year < 2005)     # taking years 2001-2004 as training set
 SmarketTrain <- Smarket[TrainIndex, ]   # for modeling this is not needed due to using Train Index as subset in the model command
 SmarketTest = Smarket[!TrainIndex, ]    
 dim(SmarketTrain)
@@ -1499,7 +1498,52 @@ Error.rate =data.frame('Logistic Error Rate' = logistic.error.rate * 100,
 
 t(Error.rate)
 
+#### Sec 5.3.1 - The Validation Set Approach ####
+# Using validation set approach to find the test error rate on linear models fit to the Auto data
+data(Auto)
+glimpse(Auto)
 
+# set.seed(1)
+TrainIndex = sample(392, 196) # generate random numbers between 1 and 392 for a total of 392/2
+
+# Simple Linear Regression
+lm.fit1 = lm(mpg ~ horsepower, 
+             data = Auto,
+             subset = TrainIndex)
+# summary(lm.fit1)
+# view(cbind(Auto$mpg, predict(lm.fit1, newdata = Auto), Auto$mpg-predict(lm.fit1, newdata = Auto)))
+simpleMSE = mean((Auto$mpg - predict(lm.fit1, newdata = Auto))[-TrainIndex]^2)
+
+# Quadratic Linear Regression
+lm.fit2 = lm(mpg ~ poly(horsepower, 2), 
+             data = Auto,
+             subset = TrainIndex)
+QuadMSE = mean((Auto$mpg - predict(lm.fit2, newdata = Auto))[-TrainIndex]^2) 
+
+# Cubic Linear Regression
+lm.fit3 = lm(mpg ~ poly(horsepower, 3), 
+             data = Auto,
+             subset = TrainIndex)
+CubicMSE = mean((Auto$mpg - predict(lm.fit3, newdata = Auto))[-TrainIndex]^2) 
+
+#### Sec 5.3.2 - The LOOCV Approach ####
+# LOOCV estimate can be automatically computed for any generalized linear model using the glm() and cv.glm() functions
+# in glm() if we don't specify the family option for it, it will do the same as a lm()
+glm(mpg ~ horsepower, data = Auto) %>% coef()
+lm(mpg ~ horsepower, data = Auto) %>% coef()
+
+glm.fit = glm(mpg ~ horsepower, data = Auto)
+library(boot)
+LOOCV.error = cv.glm(data = Auto, glm.fit) # calculates the estimated K-fold cross-validation prediction error for generalized linear models (default k=n)
+options(digits = 5)      # to show 5 total digits in the output (which will be 3 decimals in this case)
+LOOCV.error$delta
+
+LOOCV.error = rep(0,5)
+for (i in 1:5){
+     glm.fit = glm(mpg ~ poly(horsepower, i), data = Auto)
+     LOOCV.error[i] = cv.glm(data = Auto, glm.fit)$delta[1]
+}
+plot(LOOCV.error)
 
 ##### End ####
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
