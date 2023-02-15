@@ -1323,47 +1323,47 @@ Error.rate =data.frame('Logistic Error Rate' = logistic.error.rate * 100,
 t(Error.rate)
 
 ######### Ch 4 - Ex 12 ########
-# Part a
-Power = function() {
-     show(2^3)
-}
-Power()
-
-# Part b
-Power2 = function(a, b){
-     show(a^b)
-}
-Power2(4, 5)
-
-# Part c
-Power2(10, 3)
-
-# Part d
-Power3 = function(a, b){
-     result = a ^ b
-     return(result)
-}
-Power3(10, 3)
-
-# Part e
-x = 1:10
-y = Power3(x, 2)
-
-par(mfrow = c(2,2))
-plot(x, y, main = "Plot of Y = x^2")
-plot(x, y, main = "Plot of Y = x^2 on log-x axis", log = 'x')
-plot(x, y, main = "Plot of Y = x^2 on log-y axis", log = 'y')
-plot(x, y, main = "Plot of Y = x^2 on log-x and log-y axes", log = 'xy')
-par(mfrow = c(1,1))
-
-# Part f
-PlotPower = function(a, b){
-     result = x^b
-     return(plot(x, result))
-}
-
-x=-10:10
-PlotPower(x, 3)
+# # Part a
+# Power = function() {
+#      show(2^3)
+# }
+# Power()
+# 
+# # Part b
+# Power2 = function(a, b){
+#      show(a^b)
+# }
+# Power2(4, 5)
+# 
+# # Part c
+# Power2(10, 3)
+# 
+# # Part d
+# Power3 = function(a, b){
+#      result = a ^ b
+#      return(result)
+# }
+# Power3(10, 3)
+# 
+# # Part e
+# x = 1:10
+# y = Power3(x, 2)
+# 
+# par(mfrow = c(2,2))
+# plot(x, y, main = "Plot of Y = x^2")
+# plot(x, y, main = "Plot of Y = x^2 on log-x axis", log = 'x')
+# plot(x, y, main = "Plot of Y = x^2 on log-y axis", log = 'y')
+# plot(x, y, main = "Plot of Y = x^2 on log-x and log-y axes", log = 'xy')
+# par(mfrow = c(1,1))
+# 
+# # Part f
+# PlotPower = function(a, b){
+#      result = x^b
+#      return(plot(x, result))
+# }
+# 
+# x=-10:10
+# PlotPower(x, 3)
 
 ######### Ch 4 - Ex 13 ########
 # taking a look around the data
@@ -1543,7 +1543,82 @@ for (i in 1:5){
      glm.fit = glm(mpg ~ poly(horsepower, i), data = Auto)
      LOOCV.error[i] = cv.glm(data = Auto, glm.fit)$delta[1]
 }
-plot(LOOCV.error)
+plot(LOOCV.error, type = "o")
+
+#### Sec 5.3.2 - The k-fold CV Approach ####
+
+# trying with k = 10, same cv.glm can be used but this time we assign k and not leave it as default of k = n
+set.seed(17)
+kFold10.error = rep(0, 8)
+for (i in 1:8) {
+     glm.fit = glm(mpg ~ poly(horsepower, i), data = Auto)
+     kFold10.error[i] = cv.glm(data = Auto, glm.fit, K = 10)$delta[1]
+}
+plot(kFold10.error, type = "o")
+
+#### Sec 5.3.2 - The Bootstrap ####
+
+## Estimating the Accuracy of a Statistic of Interest
+# 1. create a function that computes the statistic of interest
+# 2. use boot() function from the boot library by repeatedly sampling from data with replacement
+
+data(Portfolio)
+summary(Portfolio)
+glimpse(Portfolio)
+
+# define a function to calculate the statistic of interest. In this case the statistic is called alpha and has a formula
+alpha.fn = function(data, index) {
+      X = data$X[index]
+      Y = data$Y[index]
+      return(((var(Y) - cov(X,Y))/(var(X) + var(Y) - 2*cov(X,Y))))
+}
+
+# e.g. find the alpha for the data Portfolio (which has 100 observations)
+alpha.fn(Portfolio, 10:30)
+
+# take a sample from Portfolio and find alpha for that sample using sample(x, size, replace = FALSE, prob = NULL)
+alpha.fn(Portfolio, sample(100, 100, replace = T))
+# The above can be done for so many times and record all the alpha values and then take the mean and standard deviation of all of them
+# but the function boot(data, statistic, Number of bootstrap reps, ...) will do the same
+
+boot(Portfolio, alpha.fn, R = 1000)
+
+## Estimating the Accuracy of a Linear Regression Model
+## linear regression of degree 1
+# First define a function to take the data and index set in and do a regression and return the coefficients
+# note this function doesn't need {} because it's only one-line and can also be written in one line
+boot.fn = function(data, index) 
+     return(coef(lm(mpg ~ horsepower, data = Auto, subset = index)))
+boot.fn(Auto, 1:392)
+boot.fn(Auto, sample(392, 392, replace = T))
+
+boot(data = Auto, statistic = boot.fn, R = 1000)                     # to get the bootstrap estimate for coef and their SE of linear regression
+summary(lm(mpg ~ horsepower, data = Auto))$coef   # to get the actual estimate for coef and their SE of linear regression
+
+## linear regression of degree 2 (quadratic)
+bootq.fn = function(data, index) coefficients(lm(mpg ~ horsepower + I(horsepower^2), data = Auto, subset = index))
+set.seed(1)
+boot(Auto, bootq.fn, R = 1000)
+summary(lm(mpg ~ horsepower + I(horsepower^2), data = Auto))$coef
+
+######### Ch 5 - Ex 5 ########
+data("Default")
+glimpse(Default)
+
+par(mfrow = c(1,2))
+plot(Default$balance ~ Default$default)
+plot(Default$income ~ Default$default)
+par(mfrow = c(1,1))
+
+# Part a
+set.seed(1)
+logistic.fit = glm(default ~ income + balance, data = Default, family = "binomial")
+coef(logistic.fit)
+
+# Part b
+
+
+
 
 ##### End ####
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
