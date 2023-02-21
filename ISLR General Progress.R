@@ -1615,9 +1615,51 @@ set.seed(1)
 logistic.fit = glm(default ~ income + balance, data = Default, family = "binomial")
 coef(logistic.fit)
 
-# Part b
+# Part b - validation set approach (single run)
+TrainIndex = sample(nrow(Default), nrow(Default)/2) # generate random numbers between 1 and 10,000 for a total of 5,000
+logistic.fit = glm(default ~ income + balance, 
+                   data = Default, 
+                   subset = TrainIndex,
+                   family = "binomial")
+options(digits = 5)
+options(scipen=100) 
+coef(logistic.fit)
+
+logistic.prob = predict(logistic.fit, 
+                        newdata = Default[-TrainIndex, ],  # this is our test set using the opposite of training index
+                        type = "response")
+logistic.pred = rep('No', times = nrow(Default[-TrainIndex, ]))
+logistic.pred[logistic.prob > 0.5] = 'Yes'
+table('Logistic Prediction'= logistic.pred, 'Observation' = Default[-TrainIndex, 'default'])
+(logistic.error.rate = mean(logistic.pred != Default[-TrainIndex, 'default']))
+
+# Part c - validation set approach (multiple runs) / I just defined a function to take the number of run and give me the final mean error
+ValidationSetLogistic <- function(RunTimes = 1) {
+     logistic.error.rate = data.frame(matrix(0, 
+                                             nrow = RunTimes, 
+                                             ncol = 1, 
+                                             dimnames = list(NULL, 'Error Rate')))
+     for (i in 1:RunTimes) {
+          TrainIndex = sample(nrow(Default), nrow(Default)/2)
+          logistic.fit = glm(default ~ income + balance, 
+                             data = Default, 
+                             subset = TrainIndex,
+                             family = "binomial")
+          logistic.prob = predict(logistic.fit, 
+                                  newdata = Default[-TrainIndex, ],
+                                  type = "response")
+          logistic.pred = rep('No', times = nrow(Default[-TrainIndex, ]))
+          logistic.pred[logistic.prob > 0.5] = 'Yes'
+          # table('Logistic Prediction'= logistic.pred, 'Observation' = Default[-TrainIndex, 'default'])
+          logistic.error.rate[i,] = mean(logistic.pred != Default[-TrainIndex, 'default'])
+     }
+     row.names(logistic.error.rate) = logistic.error.rate$`Run Number`
+     return(mean(logistic.error.rate[, 1]))
+}
+ValidationSetLogistic(3)
 
 
+# Part d - Adding a student dummy variable to the model
 
 
 ##### End ####
