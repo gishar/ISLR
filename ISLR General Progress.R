@@ -1601,7 +1601,7 @@ set.seed(1)
 boot(Auto, bootq.fn, R = 1000)
 summary(lm(mpg ~ horsepower + I(horsepower^2), data = Auto))$coef
 
-######### Ch 5 - Ex 5 ########
+######### Ch 5 - Ex 5 - Logistic on Default Data (w Validation Set Approach) ########
 data("Default")
 glimpse(Default)
 
@@ -1634,7 +1634,7 @@ table('Logistic Prediction'= logistic.pred, 'Observation' = Default[-TrainIndex,
 (logistic.error.rate = mean(logistic.pred != Default[-TrainIndex, 'default']))
 
 # Part c - validation set approach (multiple runs) / I just defined a function to take the number of run and give me the final mean error
-ValidationSetLogistic <- function(RunTimes = 1) {
+cValidationSetLogistic <- function(RunTimes = 1) {
      logistic.error.rate = data.frame(matrix(0, 
                                              nrow = RunTimes, 
                                              ncol = 1, 
@@ -1656,10 +1656,54 @@ ValidationSetLogistic <- function(RunTimes = 1) {
      row.names(logistic.error.rate) = logistic.error.rate$`Run Number`
      return(mean(logistic.error.rate[, 1]))
 }
-ValidationSetLogistic(3)
+cValidationSetLogistic(100)
 
 
 # Part d - Adding a student dummy variable to the model
+summary(Default$student)
+describe(Default)
+
+dValidationSetLogistic <- function(RunTimes = 5) {
+     logistic.error.rate = data.frame(matrix(0, 
+                                             nrow = RunTimes, 
+                                             ncol = 1, 
+                                             dimnames = list(NULL, 'Error Rate')))
+     for (i in seq_len(RunTimes)) {
+          TrainIndex = sample(nrow(Default), nrow(Default)/2)
+          logistic.fit = glm(default ~ income + balance + student, 
+                             data = Default, 
+                             subset = TrainIndex,
+                             family = "binomial")
+          logistic.prob = predict(logistic.fit, 
+                                  newdata = Default[-TrainIndex, ],
+                                  type = "response")
+          logistic.pred = rep('No', times = nrow(Default[-TrainIndex, ]))
+          logistic.pred[logistic.prob > 0.5] = 'Yes'
+          # table('Logistic Prediction'= logistic.pred, 'Observation' = Default[-TrainIndex, 'default'])
+          logistic.error.rate[i,] = mean(logistic.pred != Default[-TrainIndex, 'default'])
+     }
+     row.names(logistic.error.rate) = logistic.error.rate$`Run Number`
+     return(mean(logistic.error.rate[, 1]))
+}
+
+# the question is only asking for 1 run but I'm running 100 times and getting an average of all runs' errors
+dValidationSetLogistic(RunTimes = 10)
+
+######### Ch 5 - Ex 6 - Logistic on Default Data (SE of Coefficients) ########
+data("Default")
+glimpse(Default)
+
+# Part a - Coefficients SE from the formula
+options(scipen = 4)
+set.seed(1)
+glm(default ~ income + balance, 
+    data = Default, 
+    family = "binomial") %>% 
+     summary() %>% 
+     coef()
+
+# Part b - Coefficients SE using bootstrap approach
+
 
 
 ##### End ####
