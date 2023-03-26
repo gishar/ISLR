@@ -1533,7 +1533,6 @@ glm(mpg ~ horsepower, data = Auto) %>% coef()
 lm(mpg ~ horsepower, data = Auto) %>% coef()
 
 glm.fit = glm(mpg ~ horsepower, data = Auto)
-library(boot)
 LOOCV.error = cv.glm(data = Auto, glm.fit) # calculates the estimated K-fold cross-validation prediction error for generalized linear models (default k=n)
 options(digits = 5)      # to show 5 total digits in the output (which will be 3 decimals in this case)
 LOOCV.error$delta
@@ -1703,7 +1702,75 @@ glm(default ~ income + balance,
      coef()
 
 # Part b - Coefficients SE using bootstrap approach
+boot.fn = function(InputData, index) {
+     return(coef(glm(default ~ income + balance, 
+                     data = InputData,
+                     subset = index,
+                     family = "binomial")))
+}
+     
+boot.fn(Default, 1:392)
+options(scipen = 9)
+boot.fn(Default, sample(392, 392, replace = T))
 
+# Part c - use boot function to run the boot.fn function defined before for a certain number of times and find SE of coefficients
+boot(Default, boot.fn, R = 40)
+
+# Part d - comment on glm() vs bootstrap method
+# The SE for the coefficients are very close to each other, depending on how many runs we do
+
+######### Ch 5 - Ex 7 - Logistic on Weekly Data (SE of Coefficients) ########
+data("Weekly")
+glimpse(Weekly)
+
+# Part a - fit logistic and predict Direction from Lag1 and Lag2
+options(scipen = 4)
+logistic.fit1 <- glm(Direction ~ Lag1 + Lag2, 
+                    data = Weekly, 
+                    family = "binomial") 
+coef(logistic.fit1)
+logistic.prob = predict(logistic.fit1, 
+                        type = "response")
+contrasts(Weekly$Direction)
+logistic.pred = rep('Down', times = nrow(Weekly))
+logistic.pred[logistic.prob > 0.5] = 'Up'
+table('Logistic Prediction'= logistic.pred, 'Observation' = Weekly$Direction)
+(logistic.error.rate = mean(logistic.pred != Weekly$Direction))
+
+# Part b - fit logistic and predict Direction from Lag1 and Lag2 (using all but first observation)
+set.seed(1)
+logistic.fit2 <- glm(Direction ~ Lag1 + Lag2, 
+                    data = Weekly[-1, ], 
+                    family = "binomial")
+summary(logistic.fit2)
+
+# Part c - predict direction of the first observation (testing)
+logistic.prob = predict(logistic.fit2, 
+                        newdata = Weekly[1, ],
+                        type = "response") > 0.5
+if (logistic.prob > 0.5) {
+     cat("Predicted Direction is Up for 1st observation", "\n", "Incorrect Prediction")
+} else {
+     cat("Predicted Direction is Down for 1st observation", "\n", "Correct Prediction")
+}
+
+# Part d - Do the LOOCV with For loop
+LOOCV.error = rep(0, nrow(Weekly))
+for (index in 1:nrow(Weekly)) {
+     logistic.fit.i <- glm(Direction ~ Lag1 + Lag2, 
+                          data = Weekly[-index, ], 
+                          family = "binomial")
+     logistic.prob.i = predict(logistic.fit.i, 
+                             newdata = Weekly[index, ],
+                             type = "response") 
+     if (logistic.prob.i > 0.5) {Predicted.Direction = "Up"}
+          else {Predicted.Direction = "Down"}
+     if (Predicted.Direction != Weekly$Direction[index]) {LOOCV.error[index] = 1}
+}
+LOOCV.error
+
+# Part e - LOOOCV estimate for test error
+mean(LOOCV.error)
 
 
 ##### End ####
