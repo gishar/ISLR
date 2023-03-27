@@ -1535,6 +1535,10 @@ lm(mpg ~ horsepower, data = Auto) %>% coef()
 glm.fit = glm(mpg ~ horsepower, data = Auto)
 LOOCV.error = cv.glm(data = Auto, glm.fit) # calculates the estimated K-fold cross-validation prediction error for generalized linear models (default k=n)
 options(digits = 5)      # to show 5 total digits in the output (which will be 3 decimals in this case)
+
+# In the cv.glm() function, the delta value is used to estimate the cross-validation error. 
+# It is calculated as the difference between the deviance of the null model and the deviance of the model fit to the training data. 
+# The deviance is a measure of the goodness of fit of a model, so a smaller delta value indicates a better fit.
 LOOCV.error$delta
 
 LOOCV.error = rep(0,5)
@@ -1772,6 +1776,40 @@ LOOCV.error
 # Part e - LOOOCV estimate for test error
 mean(LOOCV.error)
 
+######### Ch 5 - Ex 8 - Cross-validation on a simulated dataset ########
+
+# Part a - generate simulated dataset
+set.seed(1)
+y = rnorm(100)
+x = rnorm(100)
+y = -2*x^2 + x + rnorm(100)
+
+# Part b - Create a scatter plot 
+plot(x, y)
+df = data.frame(x, y)
+# df %>% 
+#      ggplot(aes(x=x, 
+#                 y=y
+#                 )) +
+#      geom_point(size = 2, 
+#                 alpha = 0.5) +
+#      theme_classic() + 
+#      labs(title = "Ch 5, Ex 8.b (y vs x, Simulated Data)")
+
+# Part c, d, e - Fit up to degree 4 polynomial with LOOCV method and find error (different seeds) - check p-values
+set.seed(1)
+lm.fit1 = lm(y ~ x, data = df)
+LOOCV.error = rep(0,4)
+options(scipen = 50)
+for (i in 1:4){
+     lm.fit = glm(y ~ poly(x, i), data = df)
+     print(coef(summary(lm.fit)))
+     LOOCV.error[i] = cv.glm(data = df, lm.fit)$delta[1]
+}
+plot(LOOCV.error, type = "o")
+# results of c and d are the same due to LOOCV evaluating n-fold and no matter what seed is used, all will be left-out once
+
+######### Ch 5 - Ex 9 - 
 
 ##### End ####
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
