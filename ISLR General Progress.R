@@ -1595,7 +1595,7 @@ boot.fn = function(data, index)
 boot.fn(Auto, 1:392)
 boot.fn(Auto, sample(392, 392, replace = T))
 
-boot(data = Auto, statistic = boot.fn, R = 1000)                     # to get the bootstrap estimate for coef and their SE of linear regression
+boot(data = Auto, statistic = boot.fn, R = 1000)  # to get the bootstrap estimate for coef and their SE of linear regression
 summary(lm(mpg ~ horsepower, data = Auto))$coef   # to get the actual estimate for coef and their SE of linear regression
 
 ## linear regression of degree 2 (quadratic)
@@ -1712,7 +1712,6 @@ boot.fn = function(InputData, index) {
                      subset = index,
                      family = "binomial")))
 }
-     
 boot.fn(Default, 1:392)
 options(scipen = 9)
 boot.fn(Default, sample(392, 392, replace = T))
@@ -1809,7 +1808,68 @@ for (i in 1:4){
 plot(LOOCV.error, type = "o")
 # results of c and d are the same due to LOOCV evaluating n-fold and no matter what seed is used, all will be left-out once
 
-######### Ch 5 - Ex 9 - 
+######### Ch 5 - Ex 9 - Working on Boston Dataset
+data("Boston")
+
+# Part a - population mean of medv
+Muhat.medv = mean(Boston$medv)
+
+# Part b - standard error of the population mean
+SE.medv = sd(Boston$medv / sqrt(nrow(Boston)))
+# The formula to find the standard error of the population mean is SE = σ/√n. Where:
+      # SE is the standard error of the population mean
+      # σ is the population standard deviation
+      # n is the sample size
+# If the population standard deviation is unknown, you can estimate it using the sample standard deviation, s: SE = s/√n
+# In this case, you would be estimating the SE of the sample mean, which is an approx of the SE of the population mean. 
+# The larger the sample size, the more accurate the estimate of the population SE.
+
+# Part c - find the SE of Mu.hat using bootstrap
+# one-way to do this through writing the bootstrap function
+boot.mu.se = function(RunTime) {
+      Sample.Mu = rep(0, RunTime)
+      for (i in 1:RunTime) {
+            Sample.Mu[i] = Boston$medv %>% 
+                  sample(nrow(Boston), replace = T) %>% 
+                  mean()
+      }
+      return(sd(Sample.Mu))
+}
+boot.mu.se(5000)
+
+# another way to use the available boot() function (boot() function needs a statistics which is a defined function with two inputs: data and index)
+set.seed(1)
+boot.mu = function(InputData, index){
+      return(mean(InputData[index]))
+}
+maraz.mu(x$y) # when the index argument is not provided, default is using all of them
+boot(Boston$medv, boot.mu, R = 1000)
+
+# Part d - 95% CI for the mean of medv
+t.test(Boston$medv)
+c(Muhat.medv - 2*sd(boot.results$t), Muhat.medv + 2*sd(boot.results$t))
+
+# Part e - estimate the median value of the population
+med.hat = median(Boston$medv)
+
+# Part f - find the SE of Med.hat using bootstrap
+# trying bootstrap for the same thing - just for fun! which also answers 
+set.seed(1)
+boot.median = function(InputData, index){
+      return(median(InputData[index]))
+}
+boot(Boston$medv, boot.median, R = 1000)
+
+# Part g - 10th% of medv
+mu0.1hat = quantile(Boston$medv, 0.1)
+
+# Part h - find the SE for the 10th% of medv
+set.seed(1)
+boot.med10th = function(InputData, index){
+      return(quantile(InputData[index], 0.1))
+}
+boot(Boston$medv, boot.med10th, R = 1000)
+
 
 ##### End ####
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
