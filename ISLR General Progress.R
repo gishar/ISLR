@@ -80,7 +80,6 @@ ggplot(linereg.results, aes(x = linereg.results$horsepower.x,  # plot of residua
               ylab("Residuals")
 library(plotly) ; ggplotly() # Convert the recent graph to interactive plot so info can be seen by cursor on points
 
-
 ggplot(linereg.results, aes(x = linereg.results$mpg.yhat,  # plot of residuals vs. fitted values
                             y = linereg.results$linereg.res)) +
                             geom_point() +
