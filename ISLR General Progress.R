@@ -71,7 +71,6 @@ linereg.results = data.frame(horsepower.x = AutoData$horsepower # creating a tab
                              , linereg.res = linereg$residuals
                              , res.manual = linereg$fitted.values - AutoData$mpg
                              )
-
 head(linereg.results)
 ggplot(linereg.results, aes(x = linereg.results$horsepower.x,  # plot of residuals vs. x
                             y = linereg.results$res.manual )) +
@@ -122,15 +121,9 @@ ggp +                           # Add polynomial regression curve to the existin
               formula = y ~ poly(x, 5, raw = T),
               se = FALSE)
 
-
-
-
 lapply(AutoData, class) # to apply a function over a list or vector or dataframe, etc. in this case, I need to know the type of variables (to show this in a line use t())
 AutoData$cylinders <- as.factor(AutoData$cylinders) # changed the cylinders column from numeric to factor
 unique(AutoData[,2])
-
-
-
 
 
 ####@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -179,7 +172,6 @@ Student <- as.factor(Student)
 plot(Student, Balance) # just to have a quick look
 BalVSIncomeStudent.lm <- lm(Balance ~ Income + Student + Income*Student, data = Credit)
 summary(BalVSIncomeStudent.lm)
-
 
 
 ####### Grouping data and use it in graphing #######
